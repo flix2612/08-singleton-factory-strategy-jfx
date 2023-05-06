@@ -51,7 +51,7 @@ class OpenMensaAPITests {
 	@Test
 	void testGetMeals() throws IOException {
 		/* create a call to get all meals of the current day */
-		var mealsCall = api.getMeals(dateFormat.format(new Date()));
+		var mealsCall = api.getMeals();
 
 		/* execute the call synchronous */
 		var mealsResponse = mealsCall.execute();

@@ -2,6 +2,7 @@ package ohm.softa.a08.controller;
 
 import com.google.gson.Gson;
 import ohm.softa.a08.api.OpenMensaAPI;
+import ohm.softa.a08.api.OpenMensaAPIService;
 import ohm.softa.a08.model.Meal;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -47,6 +48,8 @@ public class MainController implements Initializable {
 	private final ObservableList<Meal> meals;
 	private final Gson gson;
 
+	private List<Meal> allMeals;
+
 	/**
 	 * Binding of ChoiceBox UI element to filter for certain types of meals
 	 */
@@ -73,15 +76,7 @@ public class MainController implements Initializable {
 	public MainController() {
 		meals = FXCollections.observableArrayList();
 		gson = new Gson();
-
-		/* initialize Retrofit instance */
-		var retrofit = new Retrofit.Builder()
-			.addConverterFactory(GsonConverterFactory.create(gson))
-			.baseUrl("http://openmensa.org/api/v2/")
-			.build();
-
-		/* create OpenMensaAPI instance */
-		api = retrofit.create(OpenMensaAPI.class);
+		api = OpenMensaAPIService.getInstance().getApi();
 	}
 
 	/**
@@ -98,12 +93,20 @@ public class MainController implements Initializable {
 		doGetMeals();
 	}
 
+	@FXML
+	public void filter() {
+		meals.clear();
+		MealsFilterFactory factory = new MealsFilterFactory();
+		MealsFilter mealsFilter = factory.getStrategy(filterChoiceBox.getValue());
+		meals.addAll(mealsFilter.filter(allMeals));
+	}
+
 	/**
 	 * Handles fetching of meals from OpenMensa API
 	 */
 	@FXML
 	public void doGetMeals() {
-		api.getMeals(openMensaDateFormat.format(new Date())).enqueue(new Callback<>() {
+		api.getMeals().enqueue(new Callback<>() {
 			@Override
 			public void onResponse(Call<List<Meal>> call, Response<List<Meal>> response) {
 				logger.debug("Got response");
@@ -112,22 +115,15 @@ public class MainController implements Initializable {
 					if (!response.isSuccessful() || response.body() == null) {
 						logger.error(String.format("Got response with not successfull code %d", response.code()));
 
-							var alert = new Alert(Alert.AlertType.ERROR);
-							alert.setHeaderText("Unsuccessful HTTP call");
-							alert.setContentText("Failed to get meals from OpenMensaAPI");
-							alert.show();
+						var alert = new Alert(Alert.AlertType.ERROR);
+						alert.setHeaderText("Unsuccessful HTTP call");
+						alert.setContentText("Failed to get meals from OpenMensaAPI");
+						alert.show();
 
 						return;
 					}
-
-					meals.clear();
-
-					if ("Vegetarian".equals(filterChoiceBox.getValue()))
-						meals.addAll(response.body().stream()
-							.filter(Meal::isVegetarian)
-							.collect(Collectors.toList()));
-					else
-						meals.addAll(response.body());
+					allMeals = response.body();
+					filter();
 				});
 			}
 
